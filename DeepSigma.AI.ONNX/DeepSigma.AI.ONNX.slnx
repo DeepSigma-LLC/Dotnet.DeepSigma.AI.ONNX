@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/demo/">
+    <Project Path="../DeepSigma.AI.ONNX.Demo/DeepSigma.AI.ONNX.Demo.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="DeepSigma.AI.ONNX.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="../DeepSigma.AI.ONNX.Test/DeepSigma.AI.ONNX.Test.csproj" />
+  </Folder>
+  <Folder Name="/interop/">
+    <File Path="../interop/export_iris_model.py" />
+    <File Path="../interop/iris_logreg.onnx" />
+    <File Path="../interop/iris_reference.json" />
+    <File Path="../interop/mnist-12.onnx" />
+  </Folder>
+</Solution>

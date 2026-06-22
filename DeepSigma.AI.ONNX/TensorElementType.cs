@@ -1,0 +1,20 @@
+namespace DeepSigma.AI.ONNX;
+
+public enum TensorElementType
+{
+    Unknown = 0,
+    Float = 1,
+    UInt8 = 2,
+    Int8 = 3,
+    UInt16 = 4,
+    Int16 = 5,
+    Int32 = 6,
+    Int64 = 7,
+    String = 8,
+    Bool = 9,
+    Float16 = 10,
+    Double = 11,
+    UInt32 = 12,
+    UInt64 = 13,
+    BFloat16 = 16,
+}
