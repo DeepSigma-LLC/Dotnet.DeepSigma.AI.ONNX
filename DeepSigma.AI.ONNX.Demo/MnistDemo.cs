@@ -19,9 +19,7 @@ internal static class MnistDemo
 
         Console.WriteLine("Loading mnist-12.onnx (CNN trained on MNIST, exported from CNTK)...");
         using OnnxModel model = OnnxModel.Load(modelPath);
-        Console.WriteLine($"  Producer: {model.Metadata.ProducerName}");
-        Console.WriteLine($"  Input:    {model.Inputs[0].Name} {FormatDims(model.Inputs[0].Dimensions)} ({model.Inputs[0].ElementType})");
-        Console.WriteLine($"  Output:   {model.Outputs[0].Name} {FormatDims(model.Outputs[0].Dimensions)} ({model.Outputs[0].ElementType})");
+        model.Describe();
 
         foreach ((string label, string[] artwork) in HandDrawnDigits)
         {
@@ -199,7 +197,4 @@ internal static class MnistDemo
             .Take(k)
             .ToArray();
     }
-
-    private static string FormatDims(IReadOnlyList<long?> dims) =>
-        "[" + string.Join(", ", dims.Select(d => d?.ToString() ?? "?")) + "]";
 }

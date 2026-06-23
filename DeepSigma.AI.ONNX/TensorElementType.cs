@@ -1,5 +1,6 @@
 namespace DeepSigma.AI.ONNX;
 
+/// <summary>The element data type of an ONNX tensor. Mirrors the ONNX TensorProto.DataType enum.</summary>
 public enum TensorElementType
 {
     Unknown = 0,

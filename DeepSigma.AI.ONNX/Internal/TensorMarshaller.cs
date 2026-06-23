@@ -7,8 +7,14 @@ internal static class TensorMarshaller
 {
     public static OrtValue ToOrtValue<T>(Tensor<T> tensor) where T : unmanaged
     {
-        long[] shape = LongShape(tensor.Shape);
+        long[] shape = LongShape(tensor.ShapeSpan);
         return OrtValue.CreateTensorValueFromMemory(tensor.Data, shape);
+    }
+
+    public static bool ElementTypeMatches<T>(OrtValue value) where T : unmanaged
+    {
+        var typeShape = value.GetTensorTypeAndShape();
+        return ElementTypeMap.FromOrt(typeShape.ElementDataType) == ElementTypeMap.ForClrType<T>();
     }
 
     public static OrtValue StringTensorToOrtValue(string[] data, ReadOnlySpan<int> shape)

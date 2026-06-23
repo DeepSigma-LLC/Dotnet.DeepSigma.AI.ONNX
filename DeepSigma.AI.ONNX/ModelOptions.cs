@@ -2,6 +2,10 @@ using Microsoft.ML.OnnxRuntime;
 
 namespace DeepSigma.AI.ONNX;
 
+/// <summary>
+/// Mutable session-construction options passed to <see cref="OnnxModel.Load(string, ModelOptions?)"/>.
+/// Defaults are sensible for CPU inference; only set what you need.
+/// </summary>
 public sealed class ModelOptions
 {
     public ExecutionProvider Provider { get; set; } = ExecutionProvider.Cpu;

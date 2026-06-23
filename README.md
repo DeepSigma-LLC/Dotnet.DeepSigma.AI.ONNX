@@ -44,13 +44,6 @@ using InferenceResult result = model.Run(inputs);
 Tensor<float> sum = result.Get<float>("c");
 ```
 
-Tabular convenience (single float input, single float output):
-
-```csharp
-float[] features = { 0.1f, 0.5f, -0.3f };
-float[] scores = model.Predict(features);
-```
-
 ## CUDA
 
 ```csharp

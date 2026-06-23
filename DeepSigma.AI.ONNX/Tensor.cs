@@ -1,11 +1,24 @@
 namespace DeepSigma.AI.ONNX;
 
+/// <summary>
+/// A dense tensor with a flat row-major buffer and a shape. The element type T must be unmanaged
+/// (float, double, int, long, byte, etc.). Indexers are provided up to rank 4 (NCHW); for higher
+/// ranks, compute the flat offset manually and index into <see cref="Data"/>.
+/// </summary>
 public sealed class Tensor<T> where T : unmanaged
 {
-    public T[] Data { get; }
-    public int[] Shape { get; }
+    private readonly int[] _shape;
 
-    public int Rank => Shape.Length;
+    /// <summary>The underlying row-major data buffer. Mutating is intentional (zero-copy edits).</summary>
+    public T[] Data { get; }
+
+    /// <summary>The tensor's shape, in row-major order.</summary>
+    public IReadOnlyList<int> Shape => _shape;
+
+    /// <summary>Number of dimensions.</summary>
+    public int Rank => _shape.Length;
+
+    /// <summary>Total element count (product of <see cref="Shape"/>).</summary>
     public int Length => Data.Length;
 
     public Tensor(T[] data, ReadOnlySpan<int> shape)
@@ -14,33 +27,34 @@ public sealed class Tensor<T> where T : unmanaged
         if (shape.Length == 0)
             throw new ArgumentException("Shape must have at least one dimension.", nameof(shape));
 
-        long expected = 1;
-        for (int i = 0; i < shape.Length; i++)
-        {
-            if (shape[i] < 0)
-                throw new ArgumentException($"Shape dimensions must be non-negative; got {shape[i]} at index {i}.", nameof(shape));
-            expected *= shape[i];
-        }
+        long expected = Product(shape);
         if (expected != data.Length)
             throw new ArgumentException(
                 $"Data length ({data.Length}) does not match product of shape ({expected}).",
                 nameof(data));
 
         Data = data;
-        Shape = shape.ToArray();
+        _shape = shape.ToArray();
     }
 
-    public static Tensor<T> Zeros(ReadOnlySpan<int> shape)
+    /// <summary>Allocate a zero-filled tensor of the given shape.</summary>
+    public static Tensor<T> Zeros(ReadOnlySpan<int> shape) =>
+        new(new T[(int)Product(shape)], shape);
+
+    internal ReadOnlySpan<int> ShapeSpan => _shape;
+
+    private static long Product(ReadOnlySpan<int> shape)
     {
-        int length = 1;
-        for (int i = 0; i < shape.Length; i++) length *= shape[i];
-        return new Tensor<T>(new T[length], shape);
+        long product = 1;
+        for (int i = 0; i < shape.Length; i++)
+        {
+            if (shape[i] < 0)
+                throw new ArgumentException(
+                    $"Shape dimensions must be non-negative; got {shape[i]} at index {i}.", nameof(shape));
+            product *= shape[i];
+        }
+        return product;
     }
-
-    public static Tensor<T> From(T[] data, ReadOnlySpan<int> shape) => new(data, shape);
-
-    public Span<T> AsSpan() => Data.AsSpan();
-    public ReadOnlySpan<T> AsReadOnlySpan() => Data.AsSpan();
 
     public T this[int i]
     {
@@ -61,12 +75,12 @@ public sealed class Tensor<T> where T : unmanaged
         get
         {
             CheckRank(2);
-            return Data[i * Shape[1] + j];
+            return Data[i * _shape[1] + j];
         }
         set
         {
             CheckRank(2);
-            Data[i * Shape[1] + j] = value;
+            Data[i * _shape[1] + j] = value;
         }
     }
 
@@ -75,12 +89,12 @@ public sealed class Tensor<T> where T : unmanaged
         get
         {
             CheckRank(3);
-            return Data[(i * Shape[1] + j) * Shape[2] + k];
+            return Data[(i * _shape[1] + j) * _shape[2] + k];
         }
         set
         {
             CheckRank(3);
-            Data[(i * Shape[1] + j) * Shape[2] + k] = value;
+            Data[(i * _shape[1] + j) * _shape[2] + k] = value;
         }
     }
 
@@ -89,12 +103,12 @@ public sealed class Tensor<T> where T : unmanaged
         get
         {
             CheckRank(4);
-            return Data[((n * Shape[1] + c) * Shape[2] + h) * Shape[3] + w];
+            return Data[((n * _shape[1] + c) * _shape[2] + h) * _shape[3] + w];
         }
         set
         {
             CheckRank(4);
-            Data[((n * Shape[1] + c) * Shape[2] + h) * Shape[3] + w] = value;
+            Data[((n * _shape[1] + c) * _shape[2] + h) * _shape[3] + w] = value;
         }
     }
 

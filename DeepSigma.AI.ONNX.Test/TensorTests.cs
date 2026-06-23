@@ -54,11 +54,19 @@ public class TensorTests
     }
 
     [Fact]
-    public void AsSpan_RoundTripsData()
+    public void DataSpan_RoundTrips()
     {
         var t = new Tensor<int>(new[] { 1, 2, 3 }, stackalloc int[] { 3 });
-        Span<int> span = t.AsSpan();
+        Span<int> span = t.Data.AsSpan();
         span[1] = 99;
         Assert.Equal(99, t.Data[1]);
+    }
+
+    [Fact]
+    public void Shape_IsReadOnly()
+    {
+        var t = new Tensor<int>(new[] { 1, 2, 3, 4 }, stackalloc int[] { 2, 2 });
+        Assert.IsAssignableFrom<IReadOnlyList<int>>(t.Shape);
+        Assert.Equal(new[] { 2, 2 }, t.Shape);
     }
 }

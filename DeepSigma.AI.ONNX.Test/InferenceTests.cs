@@ -57,6 +57,29 @@ public class InferenceTests
     }
 
     [Fact]
+    public void TryGet_WrongElementType_ReturnsFalseInsteadOfThrowing()
+    {
+        using OnnxModel model = OnnxModel.Load(MinimalAddModel.Create());
+        var a = new Tensor<float>(new[] { 1f }, stackalloc int[] { 1 });
+        var b = new Tensor<float>(new[] { 2f }, stackalloc int[] { 1 });
+        var inputs = new InferenceInput()
+            .Add(MinimalAddModel.InputA, a)
+            .Add(MinimalAddModel.InputB, b);
+
+        using InferenceResult result = model.Run(inputs);
+
+        Assert.False(result.TryGet<int>(MinimalAddModel.Output, out Tensor<int>? wrongType));
+        Assert.Null(wrongType);
+
+        Assert.False(result.TryGet<float>("not-a-real-output", out Tensor<float>? missing));
+        Assert.Null(missing);
+
+        Assert.True(result.TryGet<float>(MinimalAddModel.Output, out Tensor<float>? correct));
+        Assert.NotNull(correct);
+        Assert.Equal(3f, correct.Data[0]);
+    }
+
+    [Fact]
     public void Get_UnknownOutputName_ThrowsOnnxException()
     {
         using OnnxModel model = OnnxModel.Load(MinimalAddModel.Create());
@@ -77,14 +100,6 @@ public class InferenceTests
         var a = new Tensor<float>(new[] { 1f }, stackalloc int[] { 1 });
         // single-Run uses one input; but our Add model needs two — feed only one and expect ORT failure surfaced as OnnxException.
         Assert.Throws<OnnxException>(() => model.Run(MinimalAddModel.InputA, a));
-    }
-
-    [Fact]
-    public void Predict_OnMultiInputModel_ThrowsClearError()
-    {
-        using OnnxModel model = OnnxModel.Load(MinimalAddModel.Create());
-        var ex = Assert.Throws<OnnxException>(() => model.Predict(new[] { 1f, 2f, 3f }));
-        Assert.Contains("exactly one input", ex.Message);
     }
 
     [Fact]

@@ -20,7 +20,7 @@ internal static class IrisInteropDemo
 
         Console.WriteLine("Loading iris_logreg.onnx (trained + exported by Python skl2onnx)...");
         using OnnxModel model = OnnxModel.Load(modelPath);
-        DescribeModel(model);
+        model.Describe();
 
         // Build a [N, 4] float tensor from the reference samples.
         int n = reference.Samples.Count;
@@ -76,24 +76,6 @@ internal static class IrisInteropDemo
             Environment.ExitCode = 1;
         }
     }
-
-    private static void DescribeModel(OnnxModel model)
-    {
-        Console.WriteLine($"  Producer:    {model.Metadata.ProducerName}");
-        Console.WriteLine("  Inputs:");
-        foreach (TensorSpec spec in model.Inputs)
-        {
-            Console.WriteLine($"    - {spec.Name}: {spec.ElementType} [{FormatDims(spec.Dimensions)}]");
-        }
-        Console.WriteLine("  Outputs:");
-        foreach (TensorSpec spec in model.Outputs)
-        {
-            Console.WriteLine($"    - {spec.Name}: {spec.ElementType} [{FormatDims(spec.Dimensions)}]");
-        }
-    }
-
-    private static string FormatDims(IReadOnlyList<long?> dims) =>
-        string.Join(", ", dims.Select(d => d?.ToString() ?? "?"));
 
     private static bool ProbabilitiesClose(float[] net, double[] py, double tolerance)
     {

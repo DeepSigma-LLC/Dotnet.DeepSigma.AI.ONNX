@@ -3,6 +3,10 @@ using DeepSigma.AI.ONNX.Internal;
 
 namespace DeepSigma.AI.ONNX;
 
+/// <summary>
+/// The outputs of an inference call. Holds native ORT tensors until disposed — always dispose
+/// (or use a <c>using</c> block) to release them.
+/// </summary>
 public sealed class InferenceResult : IDisposable
 {
     private readonly Dictionary<string, OrtValue> _outputs;
@@ -24,6 +28,7 @@ public sealed class InferenceResult : IDisposable
         }
     }
 
+    /// <summary>Read an output tensor by name. Throws if the name is missing or the element type doesn't match.</summary>
     public Tensor<T> Get<T>(string name) where T : unmanaged
     {
         ThrowIfDisposed();
@@ -32,15 +37,20 @@ public sealed class InferenceResult : IDisposable
         return TensorMarshaller.FromOrtValue<T>(value);
     }
 
+    /// <summary>
+    /// Try to read an output tensor by name. Returns false (without throwing) if the name is missing
+    /// OR the element type doesn't match T.
+    /// </summary>
     public bool TryGet<T>(string name, out Tensor<T>? tensor) where T : unmanaged
     {
         ThrowIfDisposed();
-        if (!_outputs.ContainsKey(name))
+        if (!_outputs.TryGetValue(name, out OrtValue? value) ||
+            !TensorMarshaller.ElementTypeMatches<T>(value))
         {
             tensor = null;
             return false;
         }
-        tensor = Get<T>(name);
+        tensor = TensorMarshaller.FromOrtValue<T>(value);
         return true;
     }
 

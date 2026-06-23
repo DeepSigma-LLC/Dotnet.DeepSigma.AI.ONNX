@@ -3,14 +3,23 @@ using DeepSigma.AI.ONNX.Internal;
 
 namespace DeepSigma.AI.ONNX;
 
+/// <summary>
+/// A loaded ONNX model ready for inference. Wraps an ORT InferenceSession.
+/// Always dispose to release native resources.
+/// </summary>
 public sealed class OnnxModel : IDisposable
 {
     private readonly InferenceSession _session;
     private readonly SessionOptions _sessionOptions;
     private bool _disposed;
 
+    /// <summary>Input tensors expected by the model, in graph order.</summary>
     public IReadOnlyList<TensorSpec> Inputs { get; }
+
+    /// <summary>Output tensors produced by the model, in graph order.</summary>
     public IReadOnlyList<TensorSpec> Outputs { get; }
+
+    /// <summary>Producer, graph, version, and any custom metadata embedded in the model file.</summary>
     public ModelMetadata Metadata { get; }
 
     private OnnxModel(InferenceSession session, SessionOptions sessionOptions)
@@ -22,54 +31,29 @@ public sealed class OnnxModel : IDisposable
         Metadata = BuildMetadata(session.ModelMetadata);
     }
 
+    /// <summary>Load a model from a file path on disk.</summary>
+    /// <exception cref="OnnxException">Thrown if the file is missing or the model fails to parse.</exception>
     public static OnnxModel Load(string path, ModelOptions? options = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
         if (!File.Exists(path))
             throw new OnnxException($"Model file not found: {path}");
 
-        SessionOptions sessionOptions = SessionOptionsBuilder.Build(options);
-        try
-        {
-            var session = new InferenceSession(path, sessionOptions);
-            return new OnnxModel(session, sessionOptions);
-        }
-        catch (OnnxRuntimeException ex)
-        {
-            sessionOptions.Dispose();
-            throw new OnnxException($"Failed to load model from '{path}': {ex.Message}", ex);
-        }
-        catch
-        {
-            sessionOptions.Dispose();
-            throw;
-        }
+        return LoadCore(so => new InferenceSession(path, so), $"file '{path}'", options);
     }
 
+    /// <summary>Load a model from a serialized ONNX byte array.</summary>
+    /// <exception cref="OnnxException">Thrown if the bytes don't parse as a valid model.</exception>
     public static OnnxModel Load(byte[] modelBytes, ModelOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(modelBytes);
         if (modelBytes.Length == 0)
             throw new OnnxException("Model byte array is empty.");
 
-        SessionOptions sessionOptions = SessionOptionsBuilder.Build(options);
-        try
-        {
-            var session = new InferenceSession(modelBytes, sessionOptions);
-            return new OnnxModel(session, sessionOptions);
-        }
-        catch (OnnxRuntimeException ex)
-        {
-            sessionOptions.Dispose();
-            throw new OnnxException($"Failed to load model from bytes: {ex.Message}", ex);
-        }
-        catch
-        {
-            sessionOptions.Dispose();
-            throw;
-        }
+        return LoadCore(so => new InferenceSession(modelBytes, so), "byte array", options);
     }
 
+    /// <summary>Load a model by reading bytes from a stream. The stream is read to end but not disposed.</summary>
     public static OnnxModel Load(Stream stream, ModelOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(stream);
@@ -78,11 +62,40 @@ public sealed class OnnxModel : IDisposable
         return Load(ms.ToArray(), options);
     }
 
+    private static OnnxModel LoadCore(
+        Func<SessionOptions, InferenceSession> sessionFactory,
+        string sourceDescription,
+        ModelOptions? options)
+    {
+        SessionOptions sessionOptions = SessionOptionsBuilder.Build(options);
+        try
+        {
+            InferenceSession session = sessionFactory(sessionOptions);
+            return new OnnxModel(session, sessionOptions);
+        }
+        catch (OnnxRuntimeException ex)
+        {
+            sessionOptions.Dispose();
+            throw new OnnxException($"Failed to load model from {sourceDescription}: {ex.Message}", ex);
+        }
+        catch
+        {
+            sessionOptions.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Run inference with multi-input / multi-output. Caller must dispose the returned result
+    /// to release native output tensors.
+    /// </summary>
+    /// <exception cref="OnnxException">Thrown if the runtime rejects the inputs.</exception>
     public InferenceResult Run(InferenceInput input)
     {
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(input);
 
+        InputValidator.Validate(input.Bindings, Inputs);
         Dictionary<string, OrtValue> inputs = input.Materialize();
         try
         {
@@ -110,6 +123,10 @@ public sealed class OnnxModel : IDisposable
         }
     }
 
+    /// <summary>
+    /// Convenience for single-input / single-output models: feeds one tensor and returns
+    /// the model's sole output. Throws if the model has more than one output.
+    /// </summary>
     public Tensor<T> Run<T>(string inputName, Tensor<T> input) where T : unmanaged
     {
         ThrowIfDisposed();
@@ -125,28 +142,29 @@ public sealed class OnnxModel : IDisposable
         return result.Get<T>(Outputs[0].Name);
     }
 
-    public float[] Predict(float[] features)
+    /// <summary>
+    /// Write a human-readable summary of the model (producer, graph, inputs, outputs)
+    /// to <paramref name="writer"/>. Defaults to <see cref="Console.Out"/>.
+    /// </summary>
+    public void Describe(TextWriter? writer = null)
     {
-        ThrowIfDisposed();
-        ArgumentNullException.ThrowIfNull(features);
+        writer ??= Console.Out;
+        if (!string.IsNullOrEmpty(Metadata.ProducerName))
+            writer.WriteLine($"  Producer: {Metadata.ProducerName}");
+        if (!string.IsNullOrEmpty(Metadata.GraphName))
+            writer.WriteLine($"  Graph:    {Metadata.GraphName}");
 
-        if (Inputs.Count != 1)
-            throw new OnnxException(
-                $"Predict requires a model with exactly one input; this model has {Inputs.Count}.");
-        if (Outputs.Count != 1)
-            throw new OnnxException(
-                $"Predict requires a model with exactly one output; this model has {Outputs.Count}.");
-        if (Inputs[0].ElementType != TensorElementType.Float)
-            throw new OnnxException(
-                $"Predict requires a Float input; model input '{Inputs[0].Name}' is {Inputs[0].ElementType}.");
-        if (Outputs[0].ElementType != TensorElementType.Float)
-            throw new OnnxException(
-                $"Predict requires a Float output; model output '{Outputs[0].Name}' is {Outputs[0].ElementType}.");
+        writer.WriteLine("  Inputs:");
+        foreach (TensorSpec spec in Inputs)
+            writer.WriteLine($"    - {spec.Name}: {spec.ElementType} [{FormatDims(spec.Dimensions)}]");
 
-        var input = new Tensor<float>(features, new[] { 1, features.Length });
-        Tensor<float> output = Run(Inputs[0].Name, input);
-        return output.Data;
+        writer.WriteLine("  Outputs:");
+        foreach (TensorSpec spec in Outputs)
+            writer.WriteLine($"    - {spec.Name}: {spec.ElementType} [{FormatDims(spec.Dimensions)}]");
     }
+
+    private static string FormatDims(IReadOnlyList<long?> dims) =>
+        string.Join(", ", dims.Select(d => d?.ToString() ?? "?"));
 
     private void ThrowIfDisposed()
     {
