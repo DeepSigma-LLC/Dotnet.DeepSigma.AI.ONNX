@@ -3,13 +3,11 @@
     <Project Path="../DeepSigma.AI.ONNX.Demo/DeepSigma.AI.ONNX.Demo.csproj" />
   </Folder>
   <Folder Name="/src/">
+    <Project Path="../DeepSigma.AI.ONNX.Testing/DeepSigma.AI.ONNX.Testing.csproj" />
     <Project Path="DeepSigma.AI.ONNX.csproj" />
   </Folder>
   <Folder Name="/test/">
     <Project Path="../DeepSigma.AI.ONNX.Test/DeepSigma.AI.ONNX.Test.csproj" />
-  </Folder>
-  <Folder Name="/testing/">
-    <Project Path="../DeepSigma.AI.ONNX.Testing/DeepSigma.AI.ONNX.Testing.csproj" />
   </Folder>
   <Folder Name="/interop/">
     <File Path="../interop/export_iris_model.py" />
